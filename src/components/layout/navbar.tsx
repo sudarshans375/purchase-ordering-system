@@ -17,6 +17,7 @@ import {
   LogOut,
   User,
   LogIn,
+  History,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -25,6 +26,7 @@ const navItems = [
   { href: "/suppliers", label: "Suppliers", icon: Truck },
   { href: "/products", label: "Products", icon: Package },
   { href: "/purchase-orders", label: "Purchase Orders", icon: ShoppingCart },
+  { href: "/stock-movements", label: "Stock Movements", icon: History },
   { href: "/users", label: "Users", icon: User },
 ];
 
