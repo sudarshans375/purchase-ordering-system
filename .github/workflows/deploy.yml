@@ -1,0 +1,76 @@
+# .github/workflows/deploy.yml — CD pipeline
+# Author: Sudarshan Sonawane
+
+name: Deploy
+
+on:
+  push:
+    branches: [master, main]
+
+jobs:
+  deploy:
+    name: Build & Deploy to Azure VM
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: TypeScript check
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npx vitest run
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Build Docker image
+        run: docker build -t purchase-ordering-app .
+
+      - name: Save Docker image
+        run: docker save purchase-ordering-app | gzip > /tmp/po-app.tar.gz
+
+      - name: Copy to Azure VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_HOST }}
+          username: ${{ secrets.AZURE_USER }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          source: /tmp/po-app.tar.gz
+          target: /opt/purchase-ordering/
+          strip_components: 2
+
+      - name: Deploy on Azure VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.AZURE_HOST }}
+          username: ${{ secrets.AZURE_USER }}
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          script: |
+            cd /opt/purchase-ordering
+            tar xzf po-app.tar.gz
+            rm po-app.tar.gz
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" > .env
+            echo "REDIS_URL=${{ secrets.REDIS_URL }}" >> .env
+            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+            echo "NODE_ENV=production" >> .env
+            echo "APP_URL=http://${{ secrets.AZURE_HOST }}:3000" >> .env
+            echo "NEXT_PUBLIC_APP_URL=http://${{ secrets.AZURE_HOST }}:3000" >> .env
+            echo "PORT=3000" >> .env
+            docker compose down
+            docker compose up -d
+            sleep 15
+            curl -s http://localhost:3000/api/health || exit 1

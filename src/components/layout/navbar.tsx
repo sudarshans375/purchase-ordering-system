@@ -1,10 +1,10 @@
-// src/components/layout/navbar.tsx — Navigation bar
+// src/components/layout/navbar.tsx — Navigation bar with auth
 // Author: Sudarshan Sonawane
 
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -14,6 +14,9 @@ import {
   Menu,
   X,
   ChevronRight,
+  LogOut,
+  User,
+  LogIn,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -26,7 +29,22 @@ const navItems = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [user, setUser] = useState<{ email: string; name: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch current user on mount
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => {
+        if (res.ok) return res.json();
+        throw new Error("Not authenticated");
+      })
+      .then((data) => setUser(data.data?.user ?? null))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
+  }, [pathname]);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -51,6 +69,13 @@ export function Navbar() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setUser(null);
+    router.push("/login");
+    router.refresh();
+  };
 
   return (
     <>
@@ -138,12 +163,40 @@ export function Navbar() {
           })}
         </nav>
 
-        {/* Bottom info */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-zinc-200 bg-zinc-50/50">
-          <p className="text-[11px] text-zinc-400 text-center leading-relaxed">
-            Purchase Ordering System<br />
-            <span className="text-zinc-300">v1.0.0</span>
-          </p>
+        {/* User section at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 border-t border-zinc-200">
+          {user ? (
+            <div className="p-3 space-y-2">
+              <div className="flex items-center gap-2.5 px-3 py-2">
+                <div className="w-7 h-7 rounded-full bg-zinc-100 flex items-center justify-center">
+                  <User className="h-3.5 w-3.5 text-zinc-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-zinc-900 truncate">{user.name}</p>
+                  <p className="text-[11px] text-zinc-400 truncate">{user.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm text-zinc-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <div className="p-3">
+              {!loading && (
+                <Link
+                  href="/login"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 transition-colors"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Sign In
+                </Link>
+              )}
+            </div>
+          )}
         </div>
       </aside>
     </>
