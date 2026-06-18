@@ -1,4 +1,4 @@
-// src/app/page.tsx — Dashboard page
+// src/app/(main)/page.tsx — Dashboard page
 // Author: Sudarshan Sonawane
 
 "use client";
@@ -116,7 +116,8 @@ export default function DashboardPage() {
               <EmptyState
                 title="No purchase orders yet"
                 description="Create your first purchase order to get started."
-                icon={<ShoppingCart className="h-6 w-6" />}                  action={{
+                icon={<ShoppingCart className="h-6 w-6" />}
+                action={{
                   label: "Go to Purchase Orders",
                   onClick: () => window.location.href = "/purchase-orders",
                 }}

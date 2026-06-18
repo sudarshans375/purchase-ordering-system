@@ -137,6 +137,21 @@ model StockMovement {
   @@map("stock_movements")
 }
 
+// ─── User (authentication) ────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String              // bcrypt hash
+  name      String
+  role      String   @default("admin")  // admin, manager, viewer
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
 // ─── ReceiveIdempotency (DB-backed idempotency) ──────
 
 model ReceiveIdempotency {

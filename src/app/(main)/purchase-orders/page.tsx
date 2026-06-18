@@ -1,4 +1,4 @@
-// src/app/purchase-orders/page.tsx — Purchase Orders list
+// src/app/(main)/purchase-orders/page.tsx — Purchase Orders list
 // Author: Sudarshan Sonawane
 
 "use client";

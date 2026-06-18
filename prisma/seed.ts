@@ -2,6 +2,7 @@
 // Author: Sudarshan Sonawane
 
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -16,6 +17,7 @@ async function main() {
   await prisma.supplierProduct.deleteMany();
   await prisma.product.deleteMany();
   await prisma.supplier.deleteMany();
+  await prisma.user.deleteMany();
 
   // ─── Suppliers ────────────────────────────────────
   const suppliers = await Promise.all([
@@ -466,6 +468,22 @@ async function main() {
   await createInitialStockMovements(products);
 
   console.log(`  ✓ 3 sample purchase orders created`);
+
+  // ─── Admin User ───────────────────────────────────
+  const adminPassword = await bcrypt.hash("admin123", 12);
+  await prisma.user.upsert({
+    where: { email: "admin@posystem.com" },
+    update: {},
+    create: {
+      email: "admin@posystem.com",
+      password: adminPassword,
+      name: "Admin",
+      role: "admin",
+      isActive: true,
+    },
+  });
+  console.log(`  ✓ Admin user created (admin@posystem.com / admin123)`);
+
   console.log(`\n✅ Seeding complete!`);
 }
 

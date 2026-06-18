@@ -1,11 +1,9 @@
-// src/lib/auth.ts — JWT authentication utilities
+// src/lib/auth.ts — JWT authentication utilities (DB-backed)
 // Author: Sudarshan Sonawane
 
 import { SignJWT, jwtVerify } from "jose";
-
-// Default admin credentials (should be overridden via .env in production)
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@posystem.com";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+import { prisma } from "./prisma";
+import bcrypt from "bcryptjs";
 
 function getSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET || "pos-development-jwt-secret-key-min-32-chars!";
@@ -18,6 +16,7 @@ export interface TokenPayload {
   sub: string;
   email: string;
   name: string;
+  role: string;
 }
 
 export async function createToken(payload: TokenPayload): Promise<string> {
@@ -44,7 +43,7 @@ export async function verifyToken(token: string): Promise<TokenPayload | null> {
 export interface AuthResult {
   success: boolean;
   token?: string;
-  user?: { email: string; name: string };
+  user?: { id: string; email: string; name: string; role: string };
   error?: string;
 }
 
@@ -52,26 +51,37 @@ export async function authenticate(
   email: string,
   password: string
 ): Promise<AuthResult> {
-  // For demo: single admin user
-  // In production: check against database
-  if (email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+  // Look up user in database
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+    select: { id: true, email: true, name: true, password: true, role: true, isActive: true },
+  });
+
+  if (!user) {
     return { success: false, error: "Invalid email or password." };
   }
 
-  if (password !== ADMIN_PASSWORD) {
+  if (!user.isActive) {
+    return { success: false, error: "Account has been deactivated." };
+  }
+
+  // Verify password with bcrypt
+  const isValid = await bcrypt.compare(password, user.password);
+  if (!isValid) {
     return { success: false, error: "Invalid email or password." };
   }
 
   const token = await createToken({
-    sub: "admin-001",
-    email: ADMIN_EMAIL,
-    name: "Admin",
+    sub: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
   });
 
   return {
     success: true,
     token,
-    user: { email: ADMIN_EMAIL, name: "Admin" },
+    user: { id: user.id, email: user.email, name: user.name, role: user.role },
   };
 }
 

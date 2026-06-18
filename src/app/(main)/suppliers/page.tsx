@@ -1,4 +1,4 @@
-// src/app/suppliers/page.tsx — Suppliers list page
+// src/app/(main)/suppliers/page.tsx — Suppliers list page
 // Author: Sudarshan Sonawane
 
 "use client";

@@ -25,6 +25,7 @@ const navItems = [
   { href: "/suppliers", label: "Suppliers", icon: Truck },
   { href: "/products", label: "Products", icon: Package },
   { href: "/purchase-orders", label: "Purchase Orders", icon: ShoppingCart },
+  { href: "/users", label: "Users", icon: User },
 ];
 
 export function Navbar() {

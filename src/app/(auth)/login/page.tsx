@@ -1,4 +1,4 @@
-// src/app/login/page.tsx — Login page
+// src/app/(auth)/login/page.tsx — Login page (no sidebar)
 // Author: Sudarshan Sonawane
 
 "use client";

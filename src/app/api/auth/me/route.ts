@@ -28,8 +28,10 @@ export async function GET() {
     return NextResponse.json({
       data: {
         user: {
+          id: payload.sub,
           email: payload.email,
           name: payload.name,
+          role: payload.role,
         },
       },
     });

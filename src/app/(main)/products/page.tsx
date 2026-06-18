@@ -1,4 +1,4 @@
-// src/app/products/page.tsx — Products list page
+// src/app/(main)/products/page.tsx — Products list page
 // Author: Sudarshan Sonawane
 
 "use client";

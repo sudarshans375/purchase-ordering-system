@@ -1,10 +1,9 @@
-// src/app/layout.tsx — Root layout
+// src/app/layout.tsx — Root layout (minimal)
 // Author: Sudarshan Sonawane
 
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Navbar } from "@/components/layout/navbar";
 import { QueryProvider } from "@/providers/query-provider";
 
 const inter = Inter({
@@ -32,14 +31,7 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-gradient-to-br from-zinc-50 to-zinc-100/50 font-sans text-zinc-900">
         <QueryProvider>
-          <div className="min-h-screen lg:flex">
-            <Navbar />
-            <main className="flex-1 lg:ml-0 pb-16 lg:pb-8 min-h-screen">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-                {children}
-              </div>
-            </main>
-          </div>
+          {children}
         </QueryProvider>
       </body>
     </html>
