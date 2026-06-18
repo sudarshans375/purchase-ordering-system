@@ -378,7 +378,9 @@ export default function PurchaseOrderDetailPage() {
                   <TableHead className="text-center">Qty</TableHead>
                   <TableHead>Unit Price</TableHead>
                   <TableHead>Total</TableHead>
-                  <TableHead>Price Snapshot</TableHead>
+                  <TableHead>Snapshot Price</TableHead>
+                  <TableHead>Current Price</TableHead>
+                  <TableHead>Diff</TableHead>
                   {po.status === "DRAFT" && (
                     <TableHead className="text-right">Actions</TableHead>
                   )}
@@ -407,6 +409,19 @@ export default function PurchaseOrderDetailPage() {
                     </TableCell>
                     <TableCell className="text-zinc-500 text-sm">
                       {formatDate(item.priceSnapshotAt)}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {item.currentPriceCents != null ? formatCents(item.currentPriceCents) : formatCents(item.unitPriceCents)}
+                    </TableCell>
+                    <TableCell>
+                      {item.currentPriceCents != null && Number(item.currentPriceCents) !== Number(item.unitPriceCents) ? (
+                        <span className={Number(item.currentPriceCents) > Number(item.unitPriceCents) ? "text-rose-600 text-sm" : "text-emerald-600 text-sm"}>
+                          {Number(item.currentPriceCents) > Number(item.unitPriceCents) ? "▲" : "▼"} 
+                          {formatCents(BigInt(Math.abs(Number(item.currentPriceCents) - Number(item.unitPriceCents))))}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-400 text-sm">—</span>
+                      )}
                     </TableCell>
                     {po.status === "DRAFT" && (
                       <TableCell className="text-right">

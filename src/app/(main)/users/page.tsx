@@ -29,7 +29,7 @@ import {
 import { formatDate } from "@/lib/utils";
 import { Plus, Search, Users, Shield, ShieldAlert, Eye, EyeOff, Trash2, Edit, AlertCircle } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { queryKeys, ApiError } from "@/hooks/use-api";
+import { queryKeys, ApiError, apiFetch } from "@/hooks/use-api";
 
 interface User {
   id: string;
@@ -39,19 +39,6 @@ interface User {
   isActive: boolean;
   createdAt: string;
   updatedAt?: string;
-}
-
-async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...options?.headers },
-    ...options,
-  });
-  const body = await res.json();
-  if (!res.ok) {
-    const error = body.error || { code: "UNKNOWN", message: "An error occurred." };
-    throw new ApiError(res.status, error.code, error.message, error.details);
-  }
-  return body.data;
 }
 
 export default function UsersPage() {
@@ -84,7 +71,7 @@ export default function UsersPage() {
   searchParams.set("pageSize", "20");
 
   const { data, isLoading, error } = useQuery({
-    queryKey: [...queryKeys.dashboard, "users", { search, page }],
+    queryKey: queryKeys.users.list({ search, page }),
     queryFn: () => apiFetch<any>(`/api/users?${searchParams.toString()}`),
   });
 
@@ -92,7 +79,7 @@ export default function UsersPage() {
     mutationFn: (data: any) =>
       apiFetch<any>("/api/users", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...queryKeys.dashboard, "users"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
       setAddOpen(false);
       setFormData({ name: "", email: "", password: "", role: "manager" });
     },
@@ -101,12 +88,18 @@ export default function UsersPage() {
 
   const updateMutation = useMutation({
     mutationFn: (data: any) =>
-      apiFetch<any>("/api/users", {
+      apiFetch<any>(`/api/users/${data.id}`, {
         method: "PATCH",
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          role: data.role,
+          isActive: data.isActive,
+          ...(data.password ? { password: data.password } : {}),
+        }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...queryKeys.dashboard, "users"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
       setEditOpen(false);
       setEditUser(null);
     },
@@ -115,9 +108,9 @@ export default function UsersPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) =>
-      apiFetch<any>(`/api/users?id=${id}`, { method: "DELETE" }),
+      apiFetch<any>(`/api/users/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [...queryKeys.dashboard, "users"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
     },
   });
 

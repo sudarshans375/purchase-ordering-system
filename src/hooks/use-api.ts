@@ -5,13 +5,12 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
-  type UseQueryOptions,
 } from "@tanstack/react-query";
 import { generateIdempotencyKey } from "@/lib/utils";
 
 // ─── Fetch helper ─────────────────────────────────────
 
-async function apiFetch<T>(
+export async function apiFetch<T>(
   url: string,
   options?: RequestInit
 ): Promise<T> {
@@ -72,6 +71,11 @@ export const queryKeys = {
     detail: (id: string) => ["pos", id] as const,
   },
   dashboard: ["dashboard"] as const,
+  users: {
+    all: ["users"] as const,
+    list: (params?: Record<string, string | number | undefined>) =>
+      ["users", "list", params] as const,
+  },
 };
 
 // ─── Suppliers ─────────────────────────────────────────
@@ -107,8 +111,18 @@ export function useCreateSupplier() {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    onMutate: async (newSupplier) => {
+      await qc.cancelQueries({ queryKey: queryKeys.suppliers.all });
+      const prev = qc.getQueriesData({ queryKey: queryKeys.suppliers.all });
+      return { prev };
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.suppliers.all });
+    },
+    onError: (_err, _newSupplier, context) => {
+      if (context?.prev) {
+        context.prev.forEach(([key, data]) => qc.setQueryData(key, data));
+      }
     },
   });
 }
@@ -146,8 +160,18 @@ export function useCreateProduct() {
         method: "POST",
         body: JSON.stringify(data),
       }),
+    onMutate: async (newProduct) => {
+      await qc.cancelQueries({ queryKey: queryKeys.products.all });
+      const prev = qc.getQueriesData({ queryKey: queryKeys.products.all });
+      return { prev };
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.products.all });
+    },
+    onError: (_err, _newProduct, context) => {
+      if (context?.prev) {
+        context.prev.forEach(([key, data]) => qc.setQueryData(key, data));
+      }
     },
   });
 }
@@ -270,9 +294,20 @@ export function useReceivePurchaseOrder() {
         },
       });
     },
+    onMutate: async (poId) => {
+      await qc.cancelQueries({ queryKey: queryKeys.pos.detail(poId) });
+      await qc.cancelQueries({ queryKey: queryKeys.pos.all });
+      const prev = qc.getQueriesData({ queryKey: ["pos"] });
+      return { prev };
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.pos.all });
       qc.invalidateQueries({ queryKey: queryKeys.products.all });
+    },
+    onError: (_err, _poId, context) => {
+      if (context?.prev) {
+        context.prev.forEach(([key, data]) => qc.setQueryData(key, data));
+      }
     },
   });
 }
