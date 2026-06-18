@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton, CardSkeleton, TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useSuppliers, usePurchaseOrders, useLowStockProducts } from "@/hooks/use-api";
+import { useSuppliers, useProducts, usePurchaseOrders, useLowStockProducts } from "@/hooks/use-api";
 import { formatDate, formatCents } from "@/lib/utils";
 import { Package, ShoppingCart, Truck, AlertTriangle, TrendingUp } from "lucide-react";
 import Link from "next/link";
@@ -49,9 +49,10 @@ export default function DashboardPage() {
   const { data: posData, isLoading: loadingPos } = usePurchaseOrders({ pageSize: 1 });
   const { data: lowStockData, isLoading: loadingLowStock } = useLowStockProducts();
   const { data: recentPosData, isLoading: loadingRecent } = usePurchaseOrders({ pageSize: 5 });
-  const { data: allProducts, isLoading: loadingProducts } = useSuppliers({ pageSize: 1 });
+  const { data: productsData, isLoading: loadingProducts } = useProducts({ pageSize: 1 });
 
   const totalSuppliers = suppliersData?.total ?? 0;
+  const totalProducts = productsData?.total ?? 0;
   const totalPos = posData?.total ?? 0;
   const lowStockCount = lowStockData?.length ?? 0;
   const recentOrders = recentPosData?.items ?? [];
@@ -78,7 +79,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Total Products"
-          value={loadingProducts ? "—" : "—"}
+          value={loadingProducts ? "—" : totalProducts}
           icon={<Package className="h-5 w-5 text-violet-600" />}
           href="/products"
           color="bg-violet-50"

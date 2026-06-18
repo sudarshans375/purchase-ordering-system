@@ -34,14 +34,13 @@ import {
   Package,
   ExternalLink,
   AlertTriangle,
-  Filter,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function ProductsPage() {
+function ProductsPageContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -317,5 +316,18 @@ export default function ProductsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-zinc-100 rounded animate-pulse" />
+        <div className="h-10 w-full bg-zinc-100 rounded animate-pulse" />
+      </div>
+    }>
+      <ProductsPageContent />
+    </Suspense>
   );
 }

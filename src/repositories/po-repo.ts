@@ -3,6 +3,7 @@
 
 import { prisma, type PrismaTx } from "@/lib/prisma";
 import { NotFoundError } from "@/lib/errors";
+import { formatCents } from "@/lib/utils";
 import type { Prisma, PoStatus, MovementReason } from "@prisma/client";
 
 function tx(db: PrismaTx | undefined) {
@@ -54,7 +55,7 @@ export async function listPurchaseOrders(params: {
       supplierName: po.supplier.name,
       status: po.status,
       totalCents: po.totalCents,
-      totalFormatted: formatCentsDisplay(po.totalCents),
+      totalFormatted: formatCents(po.totalCents),
       lineItemCount: po._count.lineItems,
       placedAt: po.placedAt,
       receivedAt: po.receivedAt,
@@ -93,7 +94,7 @@ export async function getPurchaseOrderById(id: string, db?: PrismaTx) {
     supplier: po.supplier,
     status: po.status,
     totalCents: po.totalCents,
-    totalFormatted: formatCentsDisplay(po.totalCents),
+    totalFormatted: formatCents(po.totalCents),
     notes: po.notes,
     lineItems: po.lineItems.map((li) => ({
       id: li.id,
@@ -102,9 +103,9 @@ export async function getPurchaseOrderById(id: string, db?: PrismaTx) {
       productSku: li.product.sku,
       quantity: li.quantity,
       unitPriceCents: li.unitPriceCents,
-      unitPriceFormatted: formatCentsDisplay(li.unitPriceCents),
+      unitPriceFormatted: formatCents(li.unitPriceCents),
       lineTotalCents: li.lineTotalCents,
-      lineTotalFormatted: formatCentsDisplay(li.lineTotalCents),
+      lineTotalFormatted: formatCents(li.lineTotalCents),
       priceSnapshotAt: li.priceSnapshotAt,
     })),
     placedAt: po.placedAt,
@@ -268,15 +269,3 @@ export async function createIdempotencyRecord(
   return client.receiveIdempotency.create({ data });
 }
 
-// ─── Helper ───────────────────────────────────────────
-
-function formatCentsDisplay(cents: bigint): string {
-  const dollars = Number(cents) / 100;
-  return `$${dollars.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-// Using src/lib/utils formatCents instead of this private function
-// Keeping for backward compatibility

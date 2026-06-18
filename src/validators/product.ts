@@ -35,17 +35,19 @@ export const updateProductSchema = z.object({
 });
 
 export const productQuerySchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  page: z.coerce.number().int().min(1).default(1).catch(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20).catch(20),
   search: z.string().optional(),
   isActive: z
     .enum(["true", "false"])
     .transform((v) => v === "true")
-    .optional(),
+    .optional()
+    .catch(undefined),
   lowStock: z
     .enum(["true", "false"])
     .transform((v) => v === "true")
-    .optional(),
+    .optional()
+    .catch(undefined),
 });
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;

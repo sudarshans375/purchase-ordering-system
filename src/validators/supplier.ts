@@ -29,13 +29,14 @@ export const createSupplierSchema = z.object({
 export const updateSupplierSchema = createSupplierSchema.partial();
 
 export const supplierQuerySchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  page: z.coerce.number().int().min(1).default(1).catch(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20).catch(20),
   search: z.string().optional(),
   isActive: z
     .enum(["true", "false"])
     .transform((v) => v === "true")
-    .optional(),
+    .optional()
+    .catch(undefined),
 });
 
 export const linkProductSchema = z.object({
