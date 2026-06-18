@@ -122,8 +122,8 @@ sudo systemctl restart caddy
 ```bash
 cd /opt/purchase-ordering
 cat > .env << 'EOF'
-DATABASE_URL=postgresql://neondb_owner:npg_9B2ntHoChUFe@ep-cool-butterfly-at2lking-pooler.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require
-REDIS_URL=redis://default:gQAAAAAAAfkrAAIgcDE3NjBhYmMyNWU4YTg0NTE5YTA1MzI4YWQyNmU0MTM4Yg@neutral-moose-129323.upstash.io:6379
+DATABASE_URL=
+REDIS_URL=
 NODE_ENV=production
 APP_URL=https://purchase-ordering.example.com
 NEXT_PUBLIC_APP_URL=https://purchase-ordering.example.com
