@@ -5,25 +5,61 @@
   --color-foreground: #0a0a0a;
   --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  
+  /* Custom animations */
+  --animate-fade-in: fadeIn 0.4s ease-out;
+  --animate-slide-up: slideUp 0.5s ease-out;
+  --animate-scale-in: scaleIn 0.3s ease-out;
+  --animate-slide-in-right: slideInRight 0.3s ease-out;
+  --animate-slide-in-left: slideInLeft 0.3s ease-out;
+  --animate-shimmer: shimmer 2s infinite linear;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 /*
-  Light, clean design system:
-  - White backgrounds for cards and panels
-  - Soft neutral (zinc) for borders and muted text
-  - Blue for primary interactive elements
-  - Emerald for success states
-  - Amber for warning/draft states
-  - Red for error/cancelled states
-  - Clean spacing, elegant shadows
+  Modern, clean design system:
+  - White backgrounds for cards
+  - Soft zinc neutrals
+  - Gradient accents for hero elements
+  - Smooth shadows and transitions
+  - Consistent spacing
 */
 
 * {
-  border-color: oklch(0.92 0.004 286.24); /* zinc-200 */
+  border-color: oklch(0.92 0.004 286.24);
 }
 
 body {
-  background: #fafafa;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f4 100%);
   color: #0a0a0a;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -55,21 +91,70 @@ body {
   outline-offset: 2px;
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Card hover effect */
+.card-hover-effect {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
+.card-hover-effect:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -8px rgba(0, 0, 0, 0.08);
 }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #18181b 0%, #52525b 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.animate-slide-up {
-  animation: slideUp 0.4s ease-out;
+/* Pagination button hover */
+.pagination-btn {
+  transition: all 0.2s ease;
 }
+
+.pagination-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+/* Status indicator dot */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+.status-dot.draft { background: #d97706; }
+.status-dot.placed { background: #2563eb; }
+.status-dot.received { background: #059669; }
+.status-dot.cancelled { background: #dc2626; }
+
+/* Skeleton shimmer */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    oklch(0.97 0 286.29) 0%,
+    oklch(0.95 0 286.29) 50%,
+    oklch(0.97 0 286.29) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+/* Stagger animation for list items */
+.stagger-item {
+  opacity: 0;
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.stagger-item:nth-child(1) { animation-delay: 0ms; }
+.stagger-item:nth-child(2) { animation-delay: 50ms; }
+.stagger-item:nth-child(3) { animation-delay: 100ms; }
+.stagger-item:nth-child(4) { animation-delay: 150ms; }
+.stagger-item:nth-child(5) { animation-delay: 200ms; }
+.stagger-item:nth-child(6) { animation-delay: 250ms; }
+.stagger-item:nth-child(7) { animation-delay: 300ms; }
+.stagger-item:nth-child(8) { animation-delay: 350ms; }

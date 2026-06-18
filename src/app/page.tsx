@@ -5,7 +5,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton, CardSkeleton, TableSkeleton } from "@/components/ui/skeleton";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useSuppliers, useProducts, usePurchaseOrders, useLowStockProducts } from "@/hooks/use-api";
 import { formatDate, formatCents } from "@/lib/utils";
@@ -27,14 +27,14 @@ function StatCard({
 }) {
   return (
     <Link href={href} className="block group">
-      <Card className="transition-all duration-200 hover:shadow-md hover:border-zinc-300">
-        <CardContent className="p-6">
+      <Card className="card-hover-effect border-zinc-200/80">
+        <CardContent className="p-5 sm:p-6">
           <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-zinc-500">{title}</p>
-              <p className="text-2xl font-bold text-zinc-900">{value}</p>
+            <div className="space-y-1.5">
+              <p className="text-xs sm:text-sm font-medium text-zinc-500 uppercase tracking-wider">{title}</p>
+              <p className="text-xl sm:text-2xl font-bold text-zinc-900">{value}</p>
             </div>
-            <div className={`rounded-full p-3 ${color}`}>
+            <div className={`rounded-xl p-3 sm:p-3.5 ${color} ring-1 ring-inset ring-black/5`}>
               {icon}
             </div>
           </div>
@@ -61,15 +61,15 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900">Dashboard</h1>
-        <p className="text-sm text-zinc-500 mt-1">
+      <div className="relative">
+        <h1 className="text-2xl sm:text-3xl font-bold text-zinc-900 gradient-text">Dashboard</h1>
+        <p className="text-sm text-zinc-500 mt-1.5">
           Overview of your purchase ordering system
         </p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Suppliers"
           value={loadingSuppliers ? "—" : totalSuppliers}
@@ -100,7 +100,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
         {/* Recent Purchase Orders */}
         <Card>
           <CardHeader>
@@ -116,19 +116,19 @@ export default function DashboardPage() {
               <EmptyState
                 title="No purchase orders yet"
                 description="Create your first purchase order to get started."
-                icon={<ShoppingCart className="h-6 w-6" />}
-                action={{
-                  label: "Create PO",
-                  onClick: () => window.location.href = "/purchase-orders/new",
+                icon={<ShoppingCart className="h-6 w-6" />}                  action={{
+                  label: "Go to Purchase Orders",
+                  onClick: () => window.location.href = "/purchase-orders",
                 }}
               />
             ) : (
               <div className="space-y-3">
-                {recentOrders.map((po: any) => (
+                {recentOrders.map((po: any, idxR: number) => (
                   <Link
                     key={po.id}
                     href={`/purchase-orders/${po.id}`}
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-zinc-50 transition-colors"
+                    className={`flex items-center justify-between p-3 rounded-lg hover:bg-zinc-50 transition-colors stagger-item`}
+                    style={{ animationDelay: `${idxR * 50}ms` }}
                   >
                     <div className="space-y-0.5">
                       <p className="text-sm font-medium text-zinc-900">
@@ -171,12 +171,13 @@ export default function DashboardPage() {
                 icon={<TrendingUp className="h-6 w-6" />}
               />
             ) : (
-              <div className="space-y-3">
-                {lowStockProducts.map((product: any) => (
+              <div className="divide-y divide-zinc-100">
+                {lowStockProducts.map((product: any, idx: number) => (
                   <Link
                     key={product.id}
                     href={`/products/${product.id}`}
-                    className="flex items-center justify-between p-3 rounded-lg hover:bg-zinc-50 transition-colors"
+                    className={`flex items-center justify-between p-3 rounded-lg hover:bg-zinc-50 transition-colors stagger-item`}
+                    style={{ animationDelay: `${idx * 50}ms` }}
                   >
                     <div className="space-y-0.5">
                       <p className="text-sm font-medium text-zinc-900">
