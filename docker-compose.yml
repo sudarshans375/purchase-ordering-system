@@ -1,0 +1,41 @@
+# docker-compose.yml — Purchase Ordering System
+# Author: Sudarshan Sonawane
+#
+# Uses managed cloud services (Neon PostgreSQL, Upstash Redis).
+# No local database containers needed.
+#
+# Usage:
+#   docker compose up -d       # Start app
+#   docker compose down        # Stop app
+#   docker compose logs -f     # Follow logs
+
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: purchase-ordering
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - APP_URL=${APP_URL:-http://localhost:3000}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      - PORT=3000
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    networks:
+      - po-network
+
+networks:
+  po-network:
+    driver: bridge

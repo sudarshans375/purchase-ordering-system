@@ -1,0 +1,152 @@
+// prisma/schema.prisma — Purchase Ordering Module
+// Author: Sudarshan Sonawane
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ─────────────────────────────────────────────
+
+enum PoStatus {
+  DRAFT
+  PLACED
+  RECEIVED
+  CANCELLED
+}
+
+enum MovementReason {
+  RECEIVE_PO
+  CANCEL_PO
+  ADJUSTMENT_INITIAL
+}
+
+// ─── Supplier ──────────────────────────────────────────
+
+model Supplier {
+  id        String           @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  isActive  Boolean          @default(true)
+  products  SupplierProduct[]
+  pos       PurchaseOrder[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@map("suppliers")
+}
+
+// ─── Product ───────────────────────────────────────────
+
+model Product {
+  id            String           @id @default(cuid())
+  sku           String           @unique
+  name          String
+  description   String?
+  currentStock  Int              @default(0)
+  reorderLevel  Int              @default(10)
+  isActive      Boolean          @default(true)
+  suppliers     SupplierProduct[]
+  lineItems     POLineItem[]
+  movements     StockMovement[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@map("products")
+}
+
+// ─── SupplierProduct (M:N join) ───────────────────────
+
+model SupplierProduct {
+  supplierId        String
+  productId         String
+  supplier          Supplier  @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product           Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  supplierSku       String?
+  currentPriceCents BigInt    // live price, mutates over time
+  leadTimeDays      Int?
+  isPreferred       Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+
+  @@id([supplierId, productId])
+  @@unique([supplierId, supplierSku])
+  @@map("supplier_products")
+}
+
+// ─── PurchaseOrder ─────────────────────────────────────
+
+model PurchaseOrder {
+  id            String               @id @default(cuid())
+  poNumber      String               @unique
+  supplierId    String
+  supplier      Supplier             @relation(fields: [supplierId], references: [id])
+  status        PoStatus             @default(DRAFT)
+  totalCents    BigInt               @default(0)
+  notes         String?
+  placedAt      DateTime?
+  receivedAt    DateTime?
+  cancelledAt   DateTime?
+  lineItems     POLineItem[]
+  movements     StockMovement[]
+  idempotency   ReceiveIdempotency[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@map("purchase_orders")
+}
+
+// ─── POLineItem (snapshot price) ──────────────────────
+
+model POLineItem {
+  id                String        @id @default(cuid())
+  purchaseOrderId   String
+  purchaseOrder     PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId         String
+  product           Product       @relation(fields: [productId], references: [id])
+  quantity          Int
+  unitPriceCents    BigInt        // SNAPSHOT — copied at line-add, never updated
+  lineTotalCents    BigInt        // quantity * unitPriceCents
+  priceSnapshotAt   DateTime      @default(now())
+
+  @@unique([purchaseOrderId, productId])
+  @@map("po_line_items")
+}
+
+// ─── StockMovement (immutable event log) ──────────────
+
+model StockMovement {
+  id               String        @id @default(cuid())
+  productId        String
+  product          Product       @relation(fields: [productId], references: [id])
+  purchaseOrderId  String?
+  purchaseOrder    PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  delta            Int            // signed: +N for receive, -N for cancel
+  balanceAfter     Int            // Product.currentStock AFTER this movement
+  reason           MovementReason
+  idempotencyKey   String?        @unique
+  createdAt        DateTime       @default(now())
+
+  @@index([productId, createdAt])
+  @@index([purchaseOrderId])
+  @@map("stock_movements")
+}
+
+// ─── ReceiveIdempotency (DB-backed idempotency) ──────
+
+model ReceiveIdempotency {
+  key              String        @id
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  responseHash     String        // hash of the response body
+  status           Int           // HTTP status returned
+  createdAt        DateTime      @default(now())
+
+  @@index([purchaseOrderId])
+  @@map("receive_idempotency")
+}
