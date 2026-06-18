@@ -37,7 +37,7 @@ export const updateProductSchema = z.object({
 export const productQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1).catch(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20).catch(20),
-  search: z.string().optional(),
+  search: z.string().optional().catch(undefined),
   isActive: z
     .enum(["true", "false"])
     .transform((v) => v === "true")

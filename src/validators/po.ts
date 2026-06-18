@@ -24,8 +24,8 @@ export const addLineItemSchema = z.object({
 export const poQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1).catch(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20).catch(20),
-  status: z.enum(["DRAFT", "PLACED", "RECEIVED", "CANCELLED"]).optional(),
-  supplierId: z.string().optional(),
+  status: z.enum(["DRAFT", "PLACED", "RECEIVED", "CANCELLED"]).optional().catch(undefined),
+  supplierId: z.string().optional().catch(undefined),
 });
 
 export const receivePoSchema = z.object({
