@@ -44,3 +44,12 @@ init-aimemory.js
 AGENTS.md
 CLAUDE.md
 nul
+
+# Playwright
+playwright-report/
+playwright/.cache/
+test-results/
+
+# Coverage
+coverage/
+.nyc_output/

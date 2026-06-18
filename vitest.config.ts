@@ -9,6 +9,10 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["tests/**/*.test.ts"],
+    // Cloud Postgres (Neon) connections can be slow on first hit.
+    // Generous timeouts prevent spurious flakes on integration tests.
+    testTimeout: 60_000,
+    hookTimeout: 60_000,
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
