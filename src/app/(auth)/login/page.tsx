@@ -16,10 +16,16 @@ import {
 } from "@/components/ui/card";
 import { Package, Eye, EyeOff } from "lucide-react";
 
+// Pre-fill demo credentials ONLY in dev/demo mode. Production should not
+// leak a known password into the browser's autofill / DevTools.
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+const DEMO_EMAIL = "admin@posystem.com";
+const DEMO_PASSWORD = "admin123";
+
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("admin@posystem.com");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState(DEMO_MODE ? DEMO_EMAIL : "");
+  const [password, setPassword] = useState(DEMO_MODE ? DEMO_PASSWORD : "");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -126,7 +132,9 @@ export default function LoginPage() {
             </form>
 
             <p className="mt-6 text-xs text-center text-zinc-400">
-              Demo credentials are pre-filled. Just click Sign In.
+              {DEMO_MODE
+                ? "Demo credentials are pre-filled. Just click Sign In."
+                : "Sign in with your credentials."}
             </p>
           </CardContent>
         </Card>
