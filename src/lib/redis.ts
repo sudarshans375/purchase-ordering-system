@@ -180,3 +180,45 @@ export async function invalidateListCache(key: string): Promise<void> {
     // Non-critical
   }
 }
+
+/**
+ * Generic sliding-window rate limiter keyed by `<bucket>:<id>`. Used by
+ * /api/auth/login to throttle credential stuffing.
+ */
+export async function checkIpRateLimit(
+  id: string,
+  bucket: string,
+  max: number,
+  windowSecs: number
+): Promise<{ allowed: boolean; remaining: number; retryAfter: number }> {
+  const r = getRedis();
+  if (!r) {
+    // No Redis = no rate limiting (graceful degradation)
+    return { allowed: true, remaining: Infinity, retryAfter: 0 };
+  }
+
+  try {
+    const key = `ratelimit:${bucket}:${id}`;
+    const now = Date.now();
+    const window = now - windowSecs * 1000;
+
+    await r.zremrangebyscore(key, 0, window);
+    const count = await r.zcard(key);
+
+    if (count >= max) {
+      const oldest = await r.zrange(key, 0, 0, "WITHSCORES");
+      const retryAfter = oldest.length >= 2
+        ? Math.ceil((Number(oldest[1]) + windowSecs * 1000 - now) / 1000)
+        : windowSecs;
+
+      return { allowed: false, remaining: 0, retryAfter };
+    }
+
+    await r.zadd(key, now, `${now}:${Math.random()}`);
+    await r.expire(key, windowSecs);
+
+    return { allowed: true, remaining: max - count - 1, retryAfter: 0 };
+  } catch {
+    return { allowed: true, remaining: Infinity, retryAfter: 0 };
+  }
+}

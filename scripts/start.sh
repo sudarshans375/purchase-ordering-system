@@ -1,18 +1,24 @@
-#!/bin/sh
-# scripts/start.sh — Production entrypoint
-# Author: Sudarshan Sonawane
-#
-# Runs migrations on every start (idempotent).
-# Creates default admin user if missing (never wipes data).
+#!/usr/bin/env bash
+# scripts/start.sh — Container entrypoint.
+# Runs Prisma migrations + admin init on every start, then launches Next.js.
+# Idempotent — safe to run repeatedly.
 
 set -e
 
-echo "⏳ Running database migrations..."
+echo "==========================================="
+echo "  Purchase Ordering System — startup"
+echo "==========================================="
+
+# Apply pending migrations (idempotent).
+echo ""
+echo "→ Applying Prisma migrations..."
 npx prisma migrate deploy
-echo "✅ Migrations applied"
 
-echo "👤 Checking admin user..."
-npx tsx scripts/init-user.ts
+# Create the initial admin user if no users exist (idempotent — non-destructive).
+echo ""
+echo "→ Ensuring admin user exists..."
+npx tsx scripts/init-user.ts || echo "  (init-user skipped or failed — continuing)"
 
-echo "🚀 Starting application..."
+echo ""
+echo "→ Starting Next.js..."
 exec node server.js

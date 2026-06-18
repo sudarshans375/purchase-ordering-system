@@ -1,0 +1,77 @@
+# Caddyfile — reverse proxy + TLS for the Purchase Ordering System.
+# Replace `purchase-ordering.example.com` with your domain. Caddy auto-issues
+# Let's Encrypt certs via the ACME challenge on port 80.
+#
+# For an IP-only deployment (no domain), replace the site block with:
+#   :80 {
+#     reverse_proxy localhost:3000
+#     ...
+#   }
+
+# purchase-ordering.example.com
+{
+    email ops@your-domain.com  # for Let's Encrypt expiration notices
+}
+
+purchase-ordering.example.com {
+    # ─── Reverse proxy ──────────────────────────
+    reverse_proxy localhost:3000 {
+        # Forward original protocol/IP so the app can build correct URLs
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Real-IP {remote_host}
+
+        # 5-minute timeouts (default 30s is too tight for slow DB calls)
+        transport http {
+            dial_timeout 10s
+            response_header_timeout 5m
+            read_timeout 5m
+            write_timeout 5m
+        }
+    }
+
+    # ─── Compression ────────────────────────────
+    encode gzip zstd
+
+    # ─── Security headers (defense in depth) ───
+    header {
+        # Caddy already adds HSTS when serving TLS — explicit here for clarity
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+        # Disable the old XSS auditor (harmless to keep, but Next also sets it)
+        X-XSS-Protection "1; mode=block"
+        # Hides the Caddy server header
+        -Server
+    }
+
+    # ─── Rate limiting (Caddy layer) ───────────
+    # Per-IP coarse-grained throttle. Defense in depth — the app also rate-limits.
+    # Tune to your traffic profile.
+    # rate_limit {remote.ip} 100r/m
+
+    # ─── Logging ────────────────────────────────
+    log {
+        output file /var/log/caddy/purchase-ordering.log {
+            roll_size 100mb
+            roll_keep 5
+        }
+        level INFO
+    }
+
+    # ─── Health endpoint ────────────────────────
+    # Optional: expose a public health check on a separate path.
+    # @health path /api/health
+    # handle @health {
+    #     reverse_proxy localhost:3000
+    # }
+
+    # ─── Cache static assets ───────────────────
+    @assets path /_next/static/* /favicon.ico
+    handle @assets {
+        header Cache-Control "public, max-age=31536000, immutable"
+        reverse_proxy localhost:3000
+    }
+}

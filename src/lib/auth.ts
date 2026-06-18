@@ -6,7 +6,25 @@ import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 
 function getSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET || "pos-development-jwt-secret-key-min-32-chars!";
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      // Refuse to use a fallback secret in production — fail fast.
+      throw new Error(
+        "JWT_SECRET is required in production. Refusing to start with an insecure default."
+      );
+    }
+    // Dev/test only — never used in production. Throw a clear error in prod,
+    // fall back to a clearly-labeled development secret otherwise.
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[auth] JWT_SECRET not set — using insecure development fallback. " +
+        "DO NOT use this configuration in production."
+    );
+    return new TextEncoder().encode(
+      "pos-development-jwt-secret-key-min-32-chars-DO-NOT-USE-IN-PROD"
+    );
+  }
   return new TextEncoder().encode(secret);
 }
 
