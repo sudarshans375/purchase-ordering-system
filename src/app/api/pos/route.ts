@@ -2,9 +2,10 @@
 // Author: Sudarshan Sonawane
 
 import { NextRequest } from "next/server";
-import { handleApiError, apiCreated, apiSuccess } from "@/server/api-error";
+import { handleApiError, apiSuccess, apiCreated } from "@/server/api-error";
 import { createPurchaseOrderSchema, poQuerySchema } from "@/validators/po";
 import * as poService from "@/services/po-service";
+import { serializeBigInts } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,7 +18,8 @@ export async function GET(request: NextRequest) {
     });
 
     const result = await poService.listPurchaseOrders(params);
-    return apiSuccess(result);
+    // Serialize BigInt money values to strings before sending.
+    return apiSuccess(serializeBigInts(result));
   } catch (error) {
     return handleApiError(error);
   }
@@ -28,7 +30,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = createPurchaseOrderSchema.parse(body);
     const po = await poService.createPurchaseOrder(data);
-    return apiCreated(po);
+    return apiCreated(serializeBigInts(po));
   } catch (error) {
     return handleApiError(error);
   }

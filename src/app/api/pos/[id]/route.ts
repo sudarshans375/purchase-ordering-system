@@ -4,6 +4,7 @@
 import { NextRequest } from "next/server";
 import { handleApiError, apiSuccess } from "@/server/api-error";
 import * as poService from "@/services/po-service";
+import { serializeBigInts } from "@/lib/utils";
 
 export async function GET(
   _request: NextRequest,
@@ -12,7 +13,7 @@ export async function GET(
   try {
     const { id } = await params;
     const po = await poService.getPurchaseOrderById(id);
-    return apiSuccess(po);
+    return apiSuccess(serializeBigInts(po));
   } catch (error) {
     return handleApiError(error);
   }

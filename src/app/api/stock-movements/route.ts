@@ -1,9 +1,9 @@
 // src/app/api/stock-movements/route.ts — Stock movements history
 // Author: Sudarshan Sonawane
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { z } from "zod";
-import { handleApiError } from "@/server/api-error";
+import { handleApiError, apiSuccess } from "@/server/api-error";
 import { prisma } from "@/lib/prisma";
 import { Prisma, type MovementReason } from "@prisma/client";
 
@@ -52,25 +52,23 @@ export async function GET(request: NextRequest) {
       prisma.stockMovement.count({ where }),
     ]);
 
-    return NextResponse.json({
-      data: {
-        items: items.map((m) => ({
-          id: m.id,
-          productId: m.productId,
-          productName: m.product.name,
-          productSku: m.product.sku,
-          delta: m.delta,
-          balanceAfter: m.balanceAfter,
-          reason: m.reason,
-          purchaseOrderId: m.purchaseOrderId,
-          purchaseOrderNumber: m.purchaseOrder?.poNumber ?? null,
-          createdAt: m.createdAt.toISOString(),
-        })),
-        total,
-        page: params.page,
-        pageSize: params.pageSize,
-        totalPages: Math.ceil(total / params.pageSize),
-      },
+    return apiSuccess({
+      items: items.map((m) => ({
+        id: m.id,
+        productId: m.productId,
+        productName: m.product.name,
+        productSku: m.product.sku,
+        delta: m.delta,
+        balanceAfter: m.balanceAfter,
+        reason: m.reason,
+        purchaseOrderId: m.purchaseOrderId,
+        purchaseOrderNumber: m.purchaseOrder?.poNumber ?? null,
+        createdAt: m.createdAt.toISOString(),
+      })),
+      total,
+      page: params.page,
+      pageSize: params.pageSize,
+      totalPages: Math.ceil(total / params.pageSize),
     });
   } catch (error) {
     return handleApiError(error);
