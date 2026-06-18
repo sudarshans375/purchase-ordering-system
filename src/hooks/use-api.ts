@@ -7,6 +7,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { generateIdempotencyKey } from "@/lib/utils";
+import { dispatchErrorToast } from "@/lib/toast-bus";
 
 // ─── Fetch helper ─────────────────────────────────────
 
@@ -29,7 +30,12 @@ export async function apiFetch<T>(
       code: "UNKNOWN",
       message: "An unexpected error occurred.",
     };
-    throw new ApiError(res.status, error.code, error.message, error.details);
+    const apiErr = new ApiError(res.status, error.code, error.message, error.details);
+    // Auto-toast on GET failures (queries). Mutations handle their own toasts
+    // via per-mutation onError so users also see inline errors.
+    const isMutation = options?.method && options.method !== "GET";
+    if (!isMutation) dispatchErrorToast(apiErr);
+    throw apiErr;
   }
 
   return body.data;
