@@ -40,9 +40,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules ./node_modules
 
-# Copy start script
-COPY scripts/start.sh ./start.sh
-RUN chmod +x ./start.sh
+# Copy start script and init script
+COPY scripts/ ./scripts/
+RUN chmod +x ./scripts/start.sh
 
 USER nextjs
 
@@ -54,4 +54,4 @@ ENV HOSTNAME="0.0.0.0"
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
-CMD ["./start.sh"]
+CMD ["./scripts/start.sh"]
