@@ -2,7 +2,7 @@
 // Author: Sudarshan Sonawane
 
 import { prisma } from "@/lib/prisma";
-import { ConflictError, ErrorCodes } from "@/lib/errors";
+import { translatePrisma } from "@/lib/prisma-error";
 import * as productRepo from "@/repositories/product-repo";
 import { invalidateListCache } from "@/lib/redis";
 
@@ -26,30 +26,21 @@ export async function createProduct(data: {
   description?: string;
   reorderLevel?: number;
 }) {
-  try {
-    const product = await productRepo.createProduct({
+  const product = await translatePrisma(() =>
+    productRepo.createProduct({
       ...data,
       reorderLevel: data.reorderLevel ?? 10,
-    });
-    await invalidateListCache("products");
-    return product;
-  } catch (error: any) {
-    if (error?.code === "P2002") {
-      throw new ConflictError(
-        ErrorCodes.PRODUCT_SKU_DUPLICATE,
-        `A product with SKU "${data.sku}" already exists. Please use a different SKU.`,
-        { sku: data.sku }
-      );
-    }
-    throw error;
-  }
+    })
+  );
+  await invalidateListCache("products");
+  return product;
 }
 
 export async function updateProduct(
   id: string,
   data: { reorderLevel: number }
 ) {
-  const updated = await productRepo.updateProduct(id, data);
+  const updated = await translatePrisma(() => productRepo.updateProduct(id, data));
   await invalidateListCache("products");
   return updated;
 }

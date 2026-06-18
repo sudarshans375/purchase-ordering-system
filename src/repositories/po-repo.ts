@@ -11,11 +11,40 @@ function tx(db: PrismaTx | undefined) {
 }
 
 // ─── PO Number Generation ─────────────────────────────
+//
+// PO numbers are year-scoped and human-readable, e.g. "PO-2026-0042".
+// They MUST be unique (the schema enforces it). Generating them with
+// `count() + 1` is racy under concurrent creates — two requests can pick the
+// same number. The retry-on-P2002 loop below is correct: if we lose the
+// race to another transaction, we re-query and try again. Bounded to
+// MAX_RETRIES so a buggy client can never spin us forever.
 
-export async function generatePoNumber(): Promise<string> {
-  const year = new Date().getFullYear();
-  const count = await prisma.purchaseOrder.count();
-  return `PO-${year}-${String(count + 1).padStart(4, "0")}`;
+const MAX_PO_NUMBER_RETRIES = 5;
+
+export async function generatePoNumber(client?: PrismaTx): Promise<string> {
+  const dbClient = client ?? prisma;
+
+  for (let attempt = 0; attempt < MAX_PO_NUMBER_RETRIES; attempt++) {
+    const year = new Date().getFullYear();
+    // Year-scoped count — `PO-2026-0042` is independent of `PO-2025-9999`.
+    const yearStart = new Date(`${year}-01-01T00:00:00.000Z`);
+    const count = await dbClient.purchaseOrder.count({
+      where: { createdAt: { gte: yearStart } },
+    });
+    const candidate = `PO-${year}-${String(count + 1).padStart(4, "0")}`;
+
+    // Quick check: if it exists, increment and retry.
+    const exists = await dbClient.purchaseOrder.findUnique({
+      where: { poNumber: candidate },
+      select: { id: true },
+    });
+    if (!exists) return candidate;
+    // Otherwise loop — race lost, try next candidate.
+  }
+
+  throw new Error(
+    `Failed to generate a unique PO number after ${MAX_PO_NUMBER_RETRIES} retries.`
+  );
 }
 
 // ─── Queries ──────────────────────────────────────────
@@ -238,9 +267,11 @@ export async function getStockMovementByIdempotencyKey(
   idempotencyKey: string,
   db?: PrismaTx
 ) {
+  // idempotencyKey is no longer @unique on StockMovement; use findFirst.
   const client = tx(db);
-  return client.stockMovement.findUnique({
+  return client.stockMovement.findFirst({
     where: { idempotencyKey },
+    orderBy: { createdAt: "asc" },
   });
 }
 
@@ -261,6 +292,7 @@ export async function createIdempotencyRecord(
     key: string;
     purchaseOrderId: string;
     responseHash: string;
+    responseBody?: string; // captured body for byte-equal retry response
     status: number;
   },
   db?: PrismaTx

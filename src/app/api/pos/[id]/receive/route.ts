@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { handleApiError } from "@/server/api-error";
-import { ErrorCodes, ValidationError } from "@/lib/errors";
+import { ErrorCodes } from "@/lib/errors";
 import * as poService from "@/services/po-service";
 import {
   checkRateLimit,
@@ -87,16 +87,32 @@ export async function POST(
     const result = await poService.receivePurchaseOrder(id, idempotencyKey);
 
     // ── Step 5: Handle idempotent cache hit ──
+    // On retry, return the byte-equal original response body captured at the
+    // time of the first successful receive. This is what the brief means by
+    // "idempotent": the second call is indistinguishable from the first.
     if (result.idempotentCached) {
-      if (result.status === 200) {
-        const body = JSON.stringify({
-          data: {
-            id,
-            status: "RECEIVED",
-            message: "This purchase order was already received (idempotent retry).",
-          },
+      if (result.responseBody) {
+        // Cache hit AND we have the original body — replay it verbatim.
+        return new NextResponse(result.responseBody, {
+          status: result.status,
+          headers: { "Content-Type": "application/json", "X-Idempotent-Replay": "true" },
         });
-        return NextResponse.json(JSON.parse(body), { status: 200 });
+      }
+
+      // Defensive: cache row exists but body is missing (older data, recovery
+      // path). Fall back to a friendly idempotent message so clients still get
+      // a deterministic response.
+      if (result.status === 200) {
+        return NextResponse.json(
+          {
+            data: {
+              id,
+              status: "RECEIVED",
+              message: "This purchase order was already received (idempotent retry).",
+            },
+          },
+          { status: 200, headers: { "X-Idempotent-Replay": "true" } }
+        );
       }
 
       return NextResponse.json(
@@ -109,7 +125,7 @@ export async function POST(
             details: { purchaseOrderId: id },
           },
         },
-        { status: result.status }
+        { status: result.status, headers: { "X-Idempotent-Replay": "true" } }
       );
     }
 
@@ -119,7 +135,10 @@ export async function POST(
     }
 
     // ── Step 7: Return success ──
-    return NextResponse.json(JSON.parse(result.responseBody!), { status: 200 });
+    return new NextResponse(result.responseBody!, {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
     return handleApiError(error);
   }

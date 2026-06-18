@@ -31,7 +31,17 @@ export async function listProducts(params: {
   }
 
   if (lowStock) {
-    where.currentStock = { lt: prisma.product.fields.reorderLevel };
+    // Cannot compare two columns in a single Prisma where clause; use raw SQL
+    // via $queryRaw so the DB does the comparison server-side.
+    // (Prisma's `prisma.product.fields.reorderLevel` is not a valid reference
+    // for cross-column comparison in a typed where.)
+    const lowStockIds = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM products
+      WHERE "currentStock" < "reorderLevel"
+        AND "isActive" = true
+    `;
+    const ids = lowStockIds.map((r) => r.id);
+    where.id = { in: ids.length > 0 ? ids : ["__none__"] };
   }
 
   const [items, total] = await Promise.all([
@@ -113,16 +123,32 @@ export async function updateProduct(
 }
 
 export async function getLowStockProducts() {
-  const products = await prisma.product.findMany({
-    where: {
-      isActive: true,
-      currentStock: { lt: prisma.product.fields.reorderLevel },
-    },
-    orderBy: [{ currentStock: "asc" }],
-    include: {
-      _count: { select: { suppliers: true } },
-    },
+  const products = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      sku: string;
+      name: string;
+      description: string | null;
+      currentStock: number;
+      reorderLevel: number;
+      isActive: boolean;
+      updatedAt: Date;
+    }>
+  >`
+    SELECT id, sku, name, description, "currentStock", "reorderLevel", "isActive", "updatedAt"
+    FROM products
+    WHERE "isActive" = true AND "currentStock" < "reorderLevel"
+    ORDER BY "currentStock" ASC
+  `;
+
+  const supplierCounts = await prisma.supplierProduct.groupBy({
+    by: ["productId"],
+    _count: { productId: true },
+    where: { productId: { in: products.map((p) => p.id) } },
   });
+  const supplierCountMap = new Map(
+    supplierCounts.map((s) => [s.productId, s._count.productId])
+  );
 
   return products.map((p) => ({
     id: p.id,
@@ -133,7 +159,7 @@ export async function getLowStockProducts() {
     reorderLevel: p.reorderLevel,
     isLowStock: true,
     isActive: p.isActive,
-    supplierCount: p._count.suppliers,
+    supplierCount: supplierCountMap.get(p.id) ?? 0,
     deficit: p.reorderLevel - p.currentStock,
     updatedAt: p.updatedAt,
   }));

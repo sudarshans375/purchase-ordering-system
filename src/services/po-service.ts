@@ -2,6 +2,7 @@
 // Author: Sudarshan Sonawane
 
 import { prisma } from "@/lib/prisma";
+import { translatePrisma } from "@/lib/prisma-error";
 import {
   NotFoundError,
   ConflictError,
@@ -16,6 +17,7 @@ import { assertValidStockMovement, getStockDelta } from "@/domain/stock";
 import { calculateLineTotalCents, assertValidQuantity } from "@/domain/pricing";
 import { invalidateListCache } from "@/lib/redis";
 import { createHash } from "crypto";
+import { Prisma } from "@prisma/client";
 import type { PoStatus } from "@prisma/client";
 
 // ─── List ─────────────────────────────────────────────
@@ -41,19 +43,46 @@ export async function createPurchaseOrder(data: {
   supplierId: string;
   notes?: string;
 }) {
-  // Verify supplier exists
-  await supplierRepo.getSupplierById(data.supplierId);
+  // Wrap in a transaction so the existence check + insert are atomic
+  // against concurrent supplier deletion.
+  const po = await prisma.$transaction(async (tx) => {
+    await supplierRepo.getSupplierById(data.supplierId, tx);
 
-  const poNumber = await poRepo.generatePoNumber();
-
-  const po = await poRepo.createPurchaseOrder({
-    poNumber,
-    supplierId: data.supplierId,
-    notes: data.notes,
+    // Race-safe: retry up to 5 times inside the transaction.
+    let attempts = 0;
+    let poNumber: string | undefined;
+    while (!poNumber && attempts < 5) {
+      try {
+        poNumber = await poRepo.generatePoNumber(tx);
+        const created = await poRepo.createPurchaseOrder(
+          {
+            poNumber,
+            supplierId: data.supplierId,
+            notes: data.notes,
+          },
+          tx
+        );
+        return created;
+      } catch (err) {
+        // Retry on unique-constraint collision for poNumber
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === "P2002" &&
+          (err.meta?.target as string[] | undefined)?.includes("poNumber")
+        ) {
+          attempts++;
+          continue;
+        }
+        throw translatePrisma(() => Promise.reject(err));
+      }
+    }
+    throw new ConflictError(
+      "PO_NUMBER_GENERATION_FAILED",
+      "Failed to generate a unique purchase order number. Please retry."
+    );
   });
 
   await invalidateListCache("pos");
-
   return poRepo.getPurchaseOrderById(po.id);
 }
 
@@ -86,7 +115,7 @@ export async function addLineItem(
 
     if (!supplierProduct) {
       throw new ConflictError(
-        "PRODUCT_NOT_FROM_SUPPLIER",
+        ErrorCodes.PRODUCT_NOT_FROM_SUPPLIER,
         `This product is not available from the purchase order's supplier. ` +
         `Please link the product to the supplier first.`,
         { productId: data.productId, supplierId: po.supplier.id }
@@ -97,17 +126,22 @@ export async function addLineItem(
     const unitPriceCents = supplierProduct.currentPriceCents;
     const lineTotalCents = calculateLineTotalCents(data.quantity, unitPriceCents);
 
-    // Add line item
-    const lineItem = await poRepo.addLineItem(
-      purchaseOrderId,
-      {
-        productId: data.productId,
-        quantity: data.quantity,
-        unitPriceCents,
-        lineTotalCents,
-      },
-      tx
-    );
+    // Add line item (translate P2002 → PRODUCT_ALREADY_IN_PO)
+    let lineItem;
+    try {
+      lineItem = await poRepo.addLineItem(
+        purchaseOrderId,
+        {
+          productId: data.productId,
+          quantity: data.quantity,
+          unitPriceCents,
+          lineTotalCents,
+        },
+        tx
+      );
+    } catch (err) {
+      throw translatePrisma(() => Promise.reject(err));
+    }
 
     // Recalculate PO total
     await poRepo.updatePOLineItemTotals(purchaseOrderId, tx);
@@ -134,7 +168,11 @@ export async function removeLineItem(
       );
     }
 
-    await poRepo.removeLineItem(lineItemId, tx);
+    try {
+      await poRepo.removeLineItem(lineItemId, tx);
+    } catch (err) {
+      throw translatePrisma(() => Promise.reject(err));
+    }
     await poRepo.updatePOLineItemTotals(purchaseOrderId, tx);
     await invalidateListCache("pos");
   });
@@ -196,12 +234,13 @@ export async function receivePurchaseOrder(
   purchaseOrderId: string,
   idempotencyKey: string
 ) {
-  // Check idempotency cache (Redis fast path) - done in route handler
-  // DB-backed idempotency check happens inside the transaction
+  // Redis fast-path and rate-limit happen in the route handler — we trust
+  // that this function is only called after those checks pass. DB-backed
+  // idempotency is the source of truth.
 
   return prisma.$transaction(async (tx) => {
-    // Step 1: Lock the PO row with SELECT FOR UPDATE
-    // This serializes concurrent receive attempts on the same PO
+    // Step 1: Lock the PO row with SELECT FOR UPDATE.
+    // This serializes concurrent receive attempts on the same PO.
     const lockedPO = await tx.$queryRawUnsafe<Array<{ id: string; status: string }>>(
       `SELECT id, status FROM purchase_orders WHERE id = $1 FOR UPDATE`,
       purchaseOrderId
@@ -216,32 +255,36 @@ export async function receivePurchaseOrder(
     // Step 2: Assert state transition is legal
     assertCanTransition(currentStatus, "RECEIVED");
 
-    // Step 3: Check idempotency (DB source of truth)
+    // Step 3: DB-backed idempotency check (source of truth).
+    // If we already processed this key, return the cached response verbatim.
     const existingIdempotency = await poRepo.getIdempotencyRecord(idempotencyKey, tx);
     if (existingIdempotency) {
-      // This key was already used - return cached response
       return {
         idempotentCached: true,
         status: existingIdempotency.status,
+        responseBody: existingIdempotency.responseBody ?? null,
         responseHash: existingIdempotency.responseHash,
       };
     }
 
-    // Step 4: Check if StockMovement with this idempotency key already exists
+    // Step 4: Defensive — check if a StockMovement with this key exists.
+    // This catches a recovery scenario where the Idempotency row was lost but
+    // the movements persisted. We update PO to RECEIVED and return success.
     const existingMovement = await poRepo.getStockMovementByIdempotencyKey(
       idempotencyKey,
       tx
     );
     if (existingMovement) {
-      // Stock was already updated - PO must be RECEIVED already
+      const now = new Date();
       await poRepo.updatePOStatus(
         purchaseOrderId,
-        { status: "RECEIVED", receivedAt: new Date() },
+        { status: "RECEIVED", receivedAt: existingMovement.createdAt ?? now },
         tx
       );
       return {
         idempotentCached: true,
         status: 200,
+        responseBody: null,
         responseHash: "",
       };
     }
@@ -257,11 +300,12 @@ export async function receivePurchaseOrder(
       );
     }
 
-    // Step 6: Process each line item - update stock and create movements
+    // Step 6: Process each line item — update stock and create movements.
+    // All inside this transaction. idempotencyKey is the SAME across all
+    // movements of this receive (one receive = one key = N movements).
     for (const lineItem of po.lineItems) {
       const delta = getStockDelta("RECEIVE_PO", lineItem.quantity);
 
-      // Get current stock and calculate new balance
       const product = await tx.product.findUnique({
         where: { id: lineItem.productId },
         select: { id: true, currentStock: true },
@@ -271,12 +315,11 @@ export async function receivePurchaseOrder(
         throw new NotFoundError("Product", lineItem.productId);
       }
 
-      // Validate stock movement (will throw if negative stock)
+      // Validate stock movement (throws if would go negative)
       assertValidStockMovement(product.currentStock, delta, "RECEIVE_PO");
 
       const newBalance = product.currentStock + delta;
 
-      // Create stock movement record
       await poRepo.createStockMovement(
         {
           productId: lineItem.productId,
@@ -289,24 +332,25 @@ export async function receivePurchaseOrder(
         tx
       );
 
-      // Update product stock
       await poRepo.updateProductStock(lineItem.productId, newBalance, tx);
     }
 
     // Step 7: Update PO status
+    const receivedAt = new Date();
     await poRepo.updatePOStatus(
       purchaseOrderId,
-      { status: "RECEIVED", receivedAt: new Date() },
+      { status: "RECEIVED", receivedAt },
       tx
     );
 
-    // Step 8: Create idempotency record
+    // Step 8: Build, hash, and persist the response body so idempotent
+    // retries return the byte-equal original response.
     const responseBody = JSON.stringify({
       data: {
         id: po.id,
         poNumber: po.poNumber,
         status: "RECEIVED",
-        receivedAt: new Date().toISOString(),
+        receivedAt: receivedAt.toISOString(),
         lineItems: po.lineItems.map((li) => ({
           productId: li.productId,
           productName: li.productName,
@@ -325,6 +369,7 @@ export async function receivePurchaseOrder(
         key: idempotencyKey,
         purchaseOrderId,
         responseHash,
+        responseBody,
         status: 200,
       },
       tx

@@ -3,6 +3,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { ConflictError, ErrorCodes } from "@/lib/errors";
+import { translatePrisma } from "@/lib/prisma-error";
 import * as supplierRepo from "@/repositories/supplier-repo";
 import { invalidateListCache } from "@/lib/redis";
 
@@ -25,7 +26,7 @@ export async function createSupplier(data: {
   phone?: string;
   address?: string;
 }) {
-  const supplier = await supplierRepo.createSupplier(data);
+  const supplier = await translatePrisma(() => supplierRepo.createSupplier(data));
   await invalidateListCache("suppliers");
   return supplier;
 }
@@ -34,7 +35,7 @@ export async function updateSupplier(
   id: string,
   data: { name?: string; email?: string; phone?: string; address?: string }
 ) {
-  const updated = await supplierRepo.updateSupplier(id, data);
+  const updated = await translatePrisma(() => supplierRepo.updateSupplier(id, data));
   await invalidateListCache("suppliers");
   return updated;
 }
@@ -49,29 +50,24 @@ export async function linkProduct(
     isPreferred?: boolean;
   }
 ) {
-  try {
-    const result = await prisma.$transaction(async (tx) => {
-      return supplierRepo.linkProduct(supplierId, {
-        ...data,
-        currentPriceCents: BigInt(data.currentPriceCents),
-      }, tx);
-    });
-    await invalidateListCache("suppliers");
-    return result;
-  } catch (error: any) {
-    if (error?.code === "P2002" && error?.meta?.target?.includes("supplierSku")) {
-      throw new ConflictError(
-        ErrorCodes.SUPPLIER_SKU_DUPLICATE,
-        `A product with this supplier SKU already exists for this supplier.`,
-        { supplierId, supplierSku: data.supplierSku }
+  const result = await translatePrisma(() =>
+    prisma.$transaction(async (tx) => {
+      return supplierRepo.linkProduct(
+        supplierId,
+        {
+          ...data,
+          currentPriceCents: BigInt(data.currentPriceCents),
+        },
+        tx
       );
-    }
-    throw error;
-  }
+    })
+  );
+  await invalidateListCache("suppliers");
+  return result;
 }
 
 export async function unlinkProduct(supplierId: string, productId: string) {
-  await supplierRepo.unlinkProduct(supplierId, productId);
+  await translatePrisma(() => supplierRepo.unlinkProduct(supplierId, productId));
   await invalidateListCache("suppliers");
 }
 

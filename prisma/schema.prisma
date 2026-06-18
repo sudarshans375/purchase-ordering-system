@@ -129,11 +129,15 @@ model StockMovement {
   delta            Int            // signed: +N for receive, -N for cancel
   balanceAfter     Int            // Product.currentStock AFTER this movement
   reason           MovementReason
-  idempotencyKey   String?        @unique
+  // NOTE: idempotencyKey is NOT @unique here. One receive op = one key,
+  // but N stock movements (one per line item). ReceiveIdempotency is the
+  // source of truth for "did we already process this key?".
+  idempotencyKey   String?
   createdAt        DateTime       @default(now())
 
   @@index([productId, createdAt])
   @@index([purchaseOrderId])
+  @@index([idempotencyKey])
   @@map("stock_movements")
 }
 
@@ -159,6 +163,7 @@ model ReceiveIdempotency {
   purchaseOrderId  String
   purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   responseHash     String        // hash of the response body
+  responseBody     String?       // captured body for byte-equal retry response
   status           Int           // HTTP status returned
   createdAt        DateTime      @default(now())
 

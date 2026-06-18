@@ -6,12 +6,12 @@
 // NOTE: This requires a real Postgres instance.
 // Run with: DATABASE_URL=postgresql://... npx vitest run tests/integration/
 //
-// KNOWN ISSUE: This test currently exposes a real production bug.
-// The Prisma schema has `StockMovement.idempotencyKey @unique`, but a single
+// KNOWN ISSUE: This test previously exposed a real production bug.
+// The Prisma schema had `StockMovement.idempotencyKey @unique`, but a single
 // receive operation creates one StockMovement PER LINE ITEM, all sharing the
-// same idempotencyKey. The second line item violates the unique constraint.
-// This will be fixed in Phase 1 by removing the `@unique` (the ReceiveIdempotency
-// table is the source of truth for idempotency, not this column).
+// same idempotencyKey. Phase 1 fixed this by dropping `@unique` from
+// StockMovement.idempotencyKey (the ReceiveIdempotency table is now the sole
+// source of truth for idempotency). The schema change has been migrated.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { PrismaClient } from "@prisma/client";
@@ -116,12 +116,8 @@ describeIf("Concurrent Receive", () => {
    * (the second call times out waiting for a connection). In production, each HTTP
    * request flows through its own server context, so each transaction uses a
    * distinct engine instance.
-   *
-   * TODO: Once Phase 1 removes `@unique` from StockMovement.idempotencyKey,
-   * this test will pass. The fix changes the schema, generates a migration,
-   * and lets multiple StockMovements share one idempotencyKey (per receive op).
    */
-  it.skip("should allow only one concurrent receive (Promise.allSettled, different keys)", async () => {
+  it("should allow only one concurrent receive (Promise.allSettled, different keys)", async () => {
     const keyA = "00000000-0000-0000-0000-000000000001";
     const keyB = "00000000-0000-0000-0000-000000000002";
 
