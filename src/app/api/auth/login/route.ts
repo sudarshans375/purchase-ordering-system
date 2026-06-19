@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { authenticate, COOKIE_OPTIONS } from "@/lib/auth";
+import { authenticate, buildCookieOptions } from "@/lib/auth";
 import { checkIpRateLimit } from "@/lib/redis";
 
 const loginSchema = z.object({
@@ -72,13 +72,17 @@ export async function POST(request: NextRequest) {
       data: { user: result.user },
     });
 
-    // Set session cookie
-    response.cookies.set(COOKIE_OPTIONS.name, result.token, {
-      httpOnly: COOKIE_OPTIONS.httpOnly,
-      secure: COOKIE_OPTIONS.secure,
-      sameSite: COOKIE_OPTIONS.sameSite,
-      path: COOKIE_OPTIONS.path,
-      maxAge: COOKIE_OPTIONS.maxAge,
+    // Set session cookie. Secure flag is computed per-request:
+    //   - True if request is over HTTPS (X-Forwarded-Proto: https)
+    //   - False otherwise (so plain-HTTP prod setups like Azure port 3000
+    //     still get a working session — Secure cookies are dropped over HTTP)
+    const cookieOpts = buildCookieOptions(request);
+    response.cookies.set(cookieOpts.name, result.token, {
+      httpOnly: cookieOpts.httpOnly,
+      secure: cookieOpts.secure,
+      sameSite: cookieOpts.sameSite,
+      path: cookieOpts.path,
+      maxAge: cookieOpts.maxAge,
     });
 
     return response;
