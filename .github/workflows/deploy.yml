@@ -44,7 +44,7 @@ jobs:
         run: docker save purchase-ordering-app | gzip > /tmp/po-app.tar.gz
 
       - name: Copy to Azure VM
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.AZURE_HOST }}
           username: ${{ secrets.AZURE_USER }}
